@@ -1,0 +1,98 @@
+competitor_research_task:
+  description: >
+    Research the top 2-3 competitor articles for the topic: "{topic_name}"
+    Primary keyword: "{primary_keyword}"
+    
+    Search for the primary keyword and analyze what's currently ranking:
+    - What headings and structure do top articles use?
+    - What subtopics do they cover?
+    - What questions do they answer?
+    - What's missing from their coverage? (content gaps)
+    - What SERP features appear? (featured snippets, PAA, etc.)
+    
+    This research will inform the content brief outline.
+  expected_output: >
+    A competitor analysis report for "{topic_name}" containing:
+    - Summary of top 2-3 ranking articles (structure, topics covered, word count estimates)
+    - Common heading patterns across competitors
+    - Content gaps and missed opportunities
+    - SERP feature observations
+    - Recommended unique angles for our content
+  agent: content_strategist
+
+brief_generation_task:
+  description: >
+    Create a complete content brief for the topic: "{topic_name}"
+    
+    Use the competitor research and the following topic map data:
+    - Primary Keyword: {primary_keyword}
+    - Secondary Keywords: {secondary_keywords}
+    - Search Intent: {search_intent}
+    - Content Type: {content_type}
+    - Word Count: {word_count_min}-{word_count_max}
+    - Priority Score: {priority_score}
+    - Competition Level: {competition_level}
+    - Target Entities: {target_entities}
+    - Questions to Answer: {questions_to_answer}
+    - SERP Features Opportunity: {serp_features_opportunity}
+    - Internal Link Targets: {internal_link_targets}
+    - Information Gain Opportunity: {information_gain_opportunity}
+    - RAG Optimization Notes: {rag_optimization_notes}
+    
+    The brief MUST contain ALL of these sections in this exact format:
+    
+    ---
+    meta_title: "[60 chars max, primary keyword near front]"
+    meta_description: "[155 chars max, compelling, includes primary keyword]"
+    url_slug: "[lowercase-hyphenated-keyword, 3-6 words, no stop words]"
+    ---
+    
+    # Content Brief: {topic_name}
+    
+    ## Overview
+    A table with: Primary Keyword, Secondary Keywords, Search Intent, Content Type,
+    Word Count range, Priority, Competition, Target Entities, SERP Opportunities, Internal Links
+    
+    ## Writing Style & Tone
+    Voice characteristics: {brand_voice}
+    Tone for this piece: {brand_tone}
+    Style: {style_preferences}
+    POV and reading level guidance
+    
+    ## Content Outline — Heading Hierarchy
+    Full H1 -> H2 -> H3 outline with:
+    - 4-8 H2 sections based on content type ({content_type})
+    - H3 subsections where depth is needed
+    - Mark which heading targets a featured snippet with [SNIPPET TARGET]
+    - FAQ section (H2) with 4-6 questions from: {questions_to_answer}
+    
+    ## Section-by-Section Guidance
+    For each H2: purpose, 3-5 key points to cover, entities to mention, approximate word allocation
+    
+    ## Information Gain Strategy
+    What makes this piece unique: {information_gain_opportunity}
+    Original frameworks, data angles, or perspectives competitors miss
+    
+    ## RAG & LLM Optimization Notes
+    {rag_optimization_notes}
+    Opening paragraph format, atomic sections, definitions placement
+    
+    ## Questions This Content Must Answer
+    Numbered list from: {questions_to_answer}
+    
+    ## SEO Requirements Checklist
+    - [ ] Primary keyword "{primary_keyword}" in H1, first paragraph, and 2+ H2 headings
+    - [ ] Secondary keywords distributed naturally: {secondary_keywords}
+    - [ ] Target entities mentioned: {target_entities}
+    - [ ] Internal links to: {internal_link_targets}
+    - [ ] Meta title under 60 chars with keyword in first 30 chars
+    - [ ] Meta description under 155 chars, compelling, includes keyword
+    - [ ] URL slug: 3-6 words, lowercase hyphenated, no stop words
+    
+    After generating the brief, use the file_writer tool to save it to:
+    {output_dir}/briefs/{topic_name} - {date}.md
+  expected_output: >
+    A complete content brief saved as a markdown file containing all required sections:
+    frontmatter, overview table, writing style, heading hierarchy, section guidance,
+    information gain strategy, RAG notes, questions list, and SEO checklist.
+  agent: content_strategist

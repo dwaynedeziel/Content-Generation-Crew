@@ -1,0 +1,18 @@
+[project]
+name = "content-crew"
+version = "0.1.0"
+description = "Multi-agent SEO content creation system powered by CrewAI"
+requires-python = ">=3.10,<3.15"
+dependencies = [
+    "crewai[tools]>=1.9.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "streamlit>=1.30.0",
+]
+
+[project.scripts]
+content-crew = "content_crew.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
