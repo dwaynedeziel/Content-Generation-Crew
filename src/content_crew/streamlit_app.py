@@ -6,9 +6,43 @@ Launch via: python -m content_crew web
 
 from __future__ import annotations
 
+import os
 import time
 
 import streamlit as st
+
+# ---------------------------------------------------------------------------
+# Environment setup — load API keys from Streamlit secrets or .env
+# ---------------------------------------------------------------------------
+
+def _setup_env():
+    """Load API keys into os.environ from st.secrets (Cloud) or .env (local)."""
+    # Try Streamlit secrets first (Streamlit Cloud)
+    try:
+        for key in ("GEMINI_API_KEY", "SERPER_API_KEY", "MODEL", "GEMINI_API_BASE"):
+            if key in st.secrets:
+                os.environ[key] = st.secrets[key]
+    except Exception:
+        pass
+
+    # Fall back to .env file for local development
+    if not os.environ.get("GEMINI_API_KEY"):
+        try:
+            from dotenv import load_dotenv
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            load_dotenv(os.path.join(project_root, ".env"))
+        except Exception:
+            pass
+
+    # Set default model if not specified
+    if not os.environ.get("MODEL"):
+        os.environ["MODEL"] = "gemini/gemini-3-pro-preview"
+
+    # Configure LiteLLM model
+    model = os.environ.get("MODEL", "gemini/gemini-3-pro-preview")
+    os.environ["LITELLM_MODEL"] = model
+
+_setup_env()
 
 from content_crew.models import ClientContext
 from content_crew.web_flow import RunManager, RunPhase
