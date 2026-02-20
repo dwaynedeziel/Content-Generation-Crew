@@ -1,10 +1,11 @@
 [project]
 name = "content-crew"
 version = "0.1.0"
-description = "Multi-agent SEO content creation system powered by CrewAI"
-requires-python = ">=3.10,<3.14"
+description = "Multi-agent SEO content creation system powered by Google Gemini"
+requires-python = ">=3.10"
 dependencies = [
-    "crewai[tools]>=1.9.0",
+    "google-generativeai>=0.5.0",
+    "requests>=2.31.0",
     "python-dotenv>=1.0.0",
     "pydantic>=2.0.0",
     "streamlit>=1.30.0",
