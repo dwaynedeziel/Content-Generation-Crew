@@ -7,7 +7,13 @@ Launch via: python -m content_crew web
 from __future__ import annotations
 
 import os
+import sys
 import time
+
+# Ensure content_crew package is importable (Streamlit Cloud doesn't pip-install)
+_src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
 
 import streamlit as st
 
