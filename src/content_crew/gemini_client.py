@@ -1,24 +1,79 @@
-"""Gemini API client — thin wrapper around google-generativeai.
+"""LLM client — Anthropic Claude API wrapper.
 
-Provides a simple `chat()` function that handles system prompts,
-user messages, and automatic function calling loops.
+Provides a `chat()` function with system prompts, user messages,
+and automatic tool-use loops. Accepts Gemini-style tool declarations
+and converts them internally to Anthropic format.
 """
 
 from __future__ import annotations
 
-import json
 import os
 from typing import Any, Callable
 
-import google.generativeai as genai
+import anthropic
 
 
-def _configure():
-    """Configure the Gemini API key."""
-    api_key = os.environ.get("GEMINI_API_KEY")
+def _get_client() -> anthropic.Anthropic:
+    """Create an Anthropic client."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
-        raise ValueError("GEMINI_API_KEY environment variable is not set")
-    genai.configure(api_key=api_key)
+        raise ValueError("ANTHROPIC_API_KEY environment variable is not set")
+    return anthropic.Anthropic(api_key=api_key)
+
+
+def _convert_gemini_type(t: str) -> str:
+    """Convert Gemini type names (OBJECT, STRING) to JSON Schema (object, string)."""
+    return t.lower()
+
+
+def _convert_gemini_properties(props: dict) -> dict:
+    """Convert Gemini-style properties to JSON Schema properties."""
+    result = {}
+    for name, spec in props.items():
+        converted: dict[str, Any] = {}
+        if "type" in spec:
+            converted["type"] = _convert_gemini_type(spec["type"])
+        if "description" in spec:
+            converted["description"] = spec["description"]
+        if "properties" in spec:
+            converted["properties"] = _convert_gemini_properties(spec["properties"])
+        if "required" in spec:
+            converted["required"] = spec["required"]
+        if "items" in spec:
+            converted["items"] = _convert_gemini_properties({"_": spec["items"]})["_"]
+        result[name] = converted
+    return result
+
+
+def _convert_tool_declarations(gemini_decls: list[dict]) -> list[dict]:
+    """Convert Gemini-format tool declarations to Anthropic format.
+
+    Gemini format:
+        {"function_declarations": [{"name": ..., "description": ..., "parameters": {...}}]}
+
+    Anthropic format:
+        [{"name": ..., "description": ..., "input_schema": {"type": "object", ...}}]
+    """
+    anthropic_tools = []
+
+    for decl_group in gemini_decls:
+        func_decls = decl_group.get("function_declarations", [])
+        for fd in func_decls:
+            params = fd.get("parameters", {})
+            input_schema: dict[str, Any] = {
+                "type": "object",
+                "properties": _convert_gemini_properties(params.get("properties", {})),
+            }
+            if "required" in params:
+                input_schema["required"] = params["required"]
+
+            anthropic_tools.append({
+                "name": fd["name"],
+                "description": fd.get("description", ""),
+                "input_schema": input_schema,
+            })
+
+    return anthropic_tools
 
 
 def chat(
@@ -30,73 +85,70 @@ def chat(
     temperature: float = 0.7,
     max_tool_rounds: int = 10,
 ) -> str:
-    """Send a message to Gemini and return the text response.
+    """Send a message to Claude and return the text response.
 
     Args:
         system_prompt: System instruction for the model.
         user_prompt: The user's message / task description.
-        tools: Dict mapping function names to callables. When the model
-               requests a function call, it will be executed automatically.
-        tool_declarations: Gemini function declarations for the tools.
+        tools: Dict mapping function names to callables.
+        tool_declarations: Gemini-format function declarations (auto-converted).
         model_name: Override the model (default: from MODEL env var).
         temperature: Sampling temperature.
-        max_tool_rounds: Max function-call round trips before stopping.
+        max_tool_rounds: Max tool-use round trips before stopping.
 
     Returns:
         The model's final text response.
     """
-    _configure()
+    client = _get_client()
 
-    model_id = model_name or os.environ.get("MODEL", "gemini-3-pro-preview")
-    # Strip "gemini/" prefix if present (LiteLLM convention)
-    if model_id.startswith("gemini/"):
-        model_id = model_id[len("gemini/"):]
+    model_id = model_name or os.environ.get("MODEL", "claude-sonnet-4-20250514")
+    # Strip provider prefixes if present
+    for prefix in ("anthropic/", "claude/"):
+        if model_id.startswith(prefix):
+            model_id = model_id[len(prefix):]
 
-    # Build generation config
-    gen_config = genai.types.GenerationConfig(
-        temperature=temperature,
-        max_output_tokens=16384,
-    )
-
-    # Build model with tools if provided
-    model_kwargs: dict[str, Any] = {
-        "model_name": model_id,
-        "system_instruction": system_prompt,
-        "generation_config": gen_config,
-    }
-
+    # Convert tool declarations from Gemini format to Anthropic format
+    anthropic_tools = []
     if tool_declarations:
-        model_kwargs["tools"] = tool_declarations
+        anthropic_tools = _convert_tool_declarations(tool_declarations)
 
-    model = genai.GenerativeModel(**model_kwargs)
-    chat_session = model.start_chat()
+    # Build initial messages
+    messages = [{"role": "user", "content": user_prompt}]
 
-    # Send initial message
-    response = chat_session.send_message(user_prompt)
+    # Create request kwargs
+    create_kwargs: dict[str, Any] = {
+        "model": model_id,
+        "max_tokens": 16384,
+        "temperature": temperature,
+        "system": system_prompt,
+        "messages": messages,
+    }
+    if anthropic_tools:
+        create_kwargs["tools"] = anthropic_tools
 
-    # Function calling loop
+    # Initial request
+    response = client.messages.create(**create_kwargs)
+
+    # Tool-use loop
     rounds = 0
-    while rounds < max_tool_rounds:
-        # Check if the model wants to call a function
-        if not response.candidates:
+    while rounds < max_tool_rounds and response.stop_reason == "tool_use":
+        # Collect all tool use blocks
+        tool_use_blocks = [
+            block for block in response.content
+            if block.type == "tool_use"
+        ]
+
+        if not tool_use_blocks:
             break
 
-        candidate = response.candidates[0]
+        # Build assistant message with full content (text + tool_use blocks)
+        messages.append({"role": "assistant", "content": response.content})
 
-        # Check for function calls in parts
-        function_calls = []
-        for part in candidate.content.parts:
-            if hasattr(part, "function_call") and part.function_call.name:
-                function_calls.append(part.function_call)
-
-        if not function_calls:
-            break  # No more function calls, we have the final response
-
-        # Execute each function call and collect responses
-        function_responses = []
-        for fc in function_calls:
-            func_name = fc.name
-            func_args = dict(fc.args) if fc.args else {}
+        # Execute each tool call and build result message
+        tool_results = []
+        for tool_block in tool_use_blocks:
+            func_name = tool_block.name
+            func_args = tool_block.input or {}
 
             if tools and func_name in tools:
                 try:
@@ -107,23 +159,22 @@ def chat(
             else:
                 result_str = f"Unknown function: {func_name}"
 
-            function_responses.append(
-                genai.protos.Part(
-                    function_response=genai.protos.FunctionResponse(
-                        name=func_name,
-                        response={"result": result_str},
-                    )
-                )
-            )
+            tool_results.append({
+                "type": "tool_result",
+                "tool_use_id": tool_block.id,
+                "content": result_str,
+            })
 
-        # Send function results back to the model
-        response = chat_session.send_message(function_responses)
+        messages.append({"role": "user", "content": tool_results})
+
+        # Send tool results back
+        create_kwargs["messages"] = messages
+        response = client.messages.create(**create_kwargs)
         rounds += 1
 
     # Extract final text
-    if response.candidates:
-        parts = response.candidates[0].content.parts
-        text_parts = [p.text for p in parts if hasattr(p, "text") and p.text]
-        return "\n".join(text_parts)
-
-    return ""
+    text_parts = [
+        block.text for block in response.content
+        if hasattr(block, "text") and block.text
+    ]
+    return "\n".join(text_parts)

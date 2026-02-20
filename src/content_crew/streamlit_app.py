@@ -25,14 +25,14 @@ def _setup_env():
     """Load API keys into os.environ from st.secrets (Cloud) or .env (local)."""
     # Try Streamlit secrets first (Streamlit Cloud)
     try:
-        for key in ("GEMINI_API_KEY", "SERPER_API_KEY", "MODEL", "GEMINI_API_BASE"):
+        for key in ("ANTHROPIC_API_KEY", "SERPER_API_KEY", "MODEL"):
             if key in st.secrets:
                 os.environ[key] = st.secrets[key]
     except Exception:
         pass
 
     # Fall back to .env file for local development
-    if not os.environ.get("GEMINI_API_KEY"):
+    if not os.environ.get("ANTHROPIC_API_KEY"):
         try:
             from dotenv import load_dotenv
             project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -42,11 +42,7 @@ def _setup_env():
 
     # Set default model if not specified
     if not os.environ.get("MODEL"):
-        os.environ["MODEL"] = "gemini/gemini-3-pro-preview"
-
-    # Configure LiteLLM model
-    model = os.environ.get("MODEL", "gemini/gemini-3-pro-preview")
-    os.environ["LITELLM_MODEL"] = model
+        os.environ["MODEL"] = "claude-sonnet-4-20250514"
 
 _setup_env()
 
