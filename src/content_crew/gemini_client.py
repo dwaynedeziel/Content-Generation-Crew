@@ -47,7 +47,7 @@ def chat(
     """
     _configure()
 
-    model_id = model_name or os.environ.get("MODEL", "gemini-3-pro")
+    model_id = model_name or os.environ.get("MODEL", "gemini-3-pro-preview")
     # Strip "gemini/" prefix if present (LiteLLM convention)
     if model_id.startswith("gemini/"):
         model_id = model_id[len("gemini/"):]

@@ -42,10 +42,10 @@ def _setup_env():
 
     # Set default model if not specified
     if not os.environ.get("MODEL"):
-        os.environ["MODEL"] = "gemini/gemini-3-pro"
+        os.environ["MODEL"] = "gemini/gemini-3-pro-preview"
 
     # Configure LiteLLM model
-    model = os.environ.get("MODEL", "gemini/gemini-3-pro")
+    model = os.environ.get("MODEL", "gemini/gemini-3-pro-preview")
     os.environ["LITELLM_MODEL"] = model
 
 _setup_env()

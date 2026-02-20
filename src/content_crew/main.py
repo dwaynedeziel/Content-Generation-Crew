@@ -33,7 +33,7 @@ def setup_environment():
         sys.exit(1)
 
     # Configure the model for CrewAI (via LiteLLM)
-    model = os.environ.get("MODEL", "gemini/gemini-3-pro")
+    model = os.environ.get("MODEL", "gemini/gemini-3-pro-preview")
     os.environ["LITELLM_MODEL"] = model
 
     # Set GEMINI_API_BASE if provided
